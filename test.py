@@ -24,6 +24,7 @@ tf.app.flags.DEFINE_string('sample_path', '', """ path to sample image """)
 tf.app.flags.DEFINE_string('label_path', '', """ path to sample image """)
 tf.app.flags.DEFINE_string('output_path', '', """ path to validate label image """)
 tf.app.flags.DEFINE_boolean('use_avg', True, """ whether to use moving average model """)
+tf.app.flags.DEFINE_boolean('do_pp', True, """ whether to do post processing """)
 
 KITTI_BASE = 0.54
 KITTI_FOCAL = dict()
@@ -57,13 +58,16 @@ def main(args):
     if FLAGS.cfg_file:
         print('loading config setting')
         cfg_from_file(FLAGS.cfg_file, cfg)
-    cfg.BATCH_SIZE = 2
+    cfg.BATCH_SIZE = 1
+    if FLAGS.do_pp:
+        cfg.BATCH_SIZE = 2
 
     print_config(cfg)
 
-    output_path = FLAGS.output_path
-    if not os.path.isdir(output_path):
-        os.mkdir(output_path)
+    if FLAGS.output_path != '':
+        output_path = FLAGS.output_path
+        if not os.path.isdir(output_path):
+            os.mkdir(output_path)
 
     logger = log_helper.get_logger()
     if FLAGS.model == 'res50':
@@ -96,7 +100,7 @@ def main(args):
         a3_list       = []
 
         for image, label, fname in instance_label_generator(FLAGS.sample_path, FLAGS.label_path,
-                                                            cfg.IMAGE_WIDTH, cfg.IMAGE_HEIGHT):
+                                                            cfg.IMAGE_WIDTH, cfg.IMAGE_HEIGHT, FLAGS.do_pp):
             logger.info("testing for {}".format(fname))
 
 
@@ -111,8 +115,10 @@ def main(args):
             logger.info("cost time: {} s".format(end_ts - begin_ts))
             total_time_elapsed += end_ts - begin_ts
 
-            disp = pre_disp[0].squeeze()
-            disp_pp = post_process_disparity(pre_disp.squeeze())
+            if FLAGS.do_pp:
+                disp = post_process_disparity(pre_disp.squeeze())
+            else:
+                disp = pre_disp[0].squeeze()
 
             width = label.shape[1]
             focal = KITTI_FOCAL[width]
@@ -132,10 +138,12 @@ def main(args):
             a3_list.append(a3)
 
             # output_image to verify
-            output_fname = output_path + "/" + os.path.basename(fname)
-            output_pp_fname = output_path + "/pp_" + os.path.basename(fname)
-            plt.imsave(output_fname, disp, cmap=plt.cm.gray)
-            plt.imsave(output_pp_fname, disp_pp, cmap=plt.cm.gray)
+            if FLAGS.output_path != '':
+                if FLAGS.do_pp:
+                    output_fname = output_path + "/pp_" + os.path.basename(fname)
+                else:
+                    output_fname = output_path + "/" + os.path.basename(fname)
+                plt.imsave(output_fname, disp, cmap=plt.cm.gray)
 
         rmse_mean = np.array(rmse_list).mean()
         rmse_log_mean = np.array(rmse_log_list).mean()

@@ -1,4 +1,5 @@
 #!/usr/bin/python
+import cv2
 import numpy as np
 
 def _fast_hist(a, b, n):
@@ -33,6 +34,7 @@ def depth_metrics(gt_disp, pred_disp, focal, base, min_depth=1e-3, max_depth=80.
     width = gt_shape[1]
     pred_disp = width * cv2.resize(pred_disp, (width, height), interpolation=cv2.INTER_LINEAR)
     mask = gt_disp > 0
+    mask_pred = pred_disp > 0
 
     disp_diff = np.abs(gt_disp[mask] - pred_disp[mask])
     bad_pixels = np.logical_and(disp_diff >= 3, (disp_diff / gt_disp[mask]) >= 0.05)
@@ -40,6 +42,9 @@ def depth_metrics(gt_disp, pred_disp, focal, base, min_depth=1e-3, max_depth=80.
 
     gt_depth = focal * base / (gt_disp + (1.0 - mask))
     pred_depth = focal * base / pred_disp
+
+    pred_depth[pred_depth < min_depth] = min_depth
+    pred_depth[pred_depth > max_depth] = max_depth
 
     thresh = np.maximum((gt_depth[mask] / pred_depth[mask]), (pred_depth[mask] / gt_depth[mask]))
     a1 = (thresh < 1.25   ).mean()
