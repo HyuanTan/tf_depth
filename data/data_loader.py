@@ -8,6 +8,7 @@ import random
 import numpy as np
 import skimage
 import skimage.io
+import cv2
 
 def get_filename_list(sample_path, label_path):
     if not sample_path:
@@ -32,21 +33,45 @@ def get_filename_list(sample_path, label_path):
 
     return image_filenames, label_filenames
 
-def instance_generator(sample_path):
+def instance_generator(sample_path, width, height, do_pp=True):
     image_fnames, _ = get_filename_list(sample_path, None)
 
     for fname in image_fnames:
-        img = np.array(skimage.io.imread(fname), np.float32)
-        yield (img, fname)
+        img = cv2.imread(fname)
+        shape = img.shape
+        if shape[0] != height or shape[1] != width:
+            img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
+        b,g,r = cv2.split(img)
+        img = cv2.merge([r,g,b])
+        img = img.astype(np.float32) / 255.0
+        if do_pp:
+            img_flip = np.fliplr(img)
+            img_batch = np.stack([img, img_flip], axis=0)
+        else:
+            img_batch = np.expand_dims(img, axis=0)
 
-def instance_label_generator(sample_path, label_path):
+        yield (img_batch, fname)
+
+def instance_label_generator(sample_path, label_path, width, height, do_pp=True):
     image_fnames, label_fnames = get_filename_list(sample_path, label_path)
 
     for fname, label_fname in zip(image_fnames, label_fnames):
-        img = np.array(skimage.io.imread(fname), np.float32)
-        label = np.array(skimage.io.imread(label_fname), np.int32)
-        label = label[..., np.newaxis]
-        yield (img, label, fname)
+        img = cv2.imread(fname)
+        shape = img.shape
+        if shape[0] != height or shape[1] != width:
+            img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
+        b,g,r = cv2.split(img)
+        img = cv2.merge([r,g,b])
+        img = img.astype(np.float32) / 255.0
+        if do_pp:
+            img_flip = np.fliplr(img)
+            img_batch = np.stack([img, img_flip], axis=0)
+        else:
+            img_batch = np.expand_dims(img, axis=0)
+
+        label = cv2.imread(label_fname, -1)
+        label = label.astype(np.float32) / 256      # for KITTI disp image
+        yield (img_batch, label, fname)
 
 class LoadingPipeline(object):
 

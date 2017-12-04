@@ -5,54 +5,50 @@ import os
 import time
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
-from nets.sq_net import SQSegNet
-from nets.erf_net import ERFSegNet
+from nets.res50_disp_net import Res50DispNet
 from data.data_loader import instance_label_generator
-import data.image_process as image_process
 from config import cfg
-from utils.training_utils import get_train_op, add_summaries
 from utils.config_utils import cfg_from_file, print_config
-from utils.metrics import per_class_iu
+from utils.metrics import depth_metrics
 from utils import log_helper
 
 
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string('model', 'sq', """ which model to use """)
+tf.app.flags.DEFINE_string('model', 'res50', """ which model to use """)
 tf.app.flags.DEFINE_string('ckpt_path', '', """ path to restore model ckpt """)
 tf.app.flags.DEFINE_string('cfg_file', '', """ experimental config file """)
 tf.app.flags.DEFINE_string('sample_path', '', """ path to sample image """)
 tf.app.flags.DEFINE_string('label_path', '', """ path to sample image """)
 tf.app.flags.DEFINE_string('output_path', '', """ path to validate label image """)
-tf.app.flags.DEFINE_boolean('debug', False, """ if in debug mode """)
-tf.app.flags.DEFINE_string('dbg_tname', '', """ if in debug mode """)
-#tf.app.flags.DEFINE_string('mask_path', '', """ path to validate label image """)
+tf.app.flags.DEFINE_boolean('use_avg', True, """ whether to use moving average model """)
 
+KITTI_BASE = 0.54
+KITTI_FOCAL = dict()
+KITTI_FOCAL[1242] = 721.5377
+KITTI_FOCAL[1241] = 718.856
+KITTI_FOCAL[1224] = 707.0493
+KITTI_FOCAL[1238] = 718.3351
 
+def post_process_disparity(disp):
+    _, h, w = disp.shape
+    l_disp = disp[0,:,:]
+    r_disp = np.fliplr(disp[1,:,:])
+    m_disp = 0.5 * (l_disp + r_disp)
+    l, _ = np.meshgrid(np.linspace(0, 1, w), np.linspace(0, 1, h))
+    l_mask = 1.0 - np.clip(20 * (l - 0.05), 0, 1)
+    r_mask = np.fliplr(l_mask)
+    return r_mask * l_disp + l_mask * r_disp + (1.0 - l_mask - r_mask) * m_disp
 
 def checkArgs():
     print('Inference model: {}'.format(FLAGS.model))
     print("Sample image path: {}".format(FLAGS.sample_path))
     print("Label image path: {}".format(FLAGS.label_path))
     print("Prediction output path: {}".format(FLAGS.output_path))
-    #print("Mask output path: {}".format(FLAGS.mask_path))
     print("Modle checkpoint path: {}".format(FLAGS.ckpt_path))
     print("Config file: {}".format(FLAGS.cfg_file))
-
-def genPredProb(image):
-    """ store label data to colored image """
-    # set green color to probability map
-    prob_img = image[:,:,1]
-    r = np.zeros_like(prob_img)
-    g = prob_img.copy() * 255
-    b = np.zeros_like(prob_img)
-    rgb = np.zeros((image.shape[0], image.shape[1], 3))
-    rgb[:,:,0] = r
-    rgb[:,:,1] = g
-    rgb[:,:,2] = b
-    im = np.uint8(rgb)
-    return im
 
 
 def main(args):
@@ -61,94 +57,99 @@ def main(args):
     if FLAGS.cfg_file:
         print('loading config setting')
         cfg_from_file(FLAGS.cfg_file, cfg)
-    cfg.BATCH_SIZE = 1
+    cfg.BATCH_SIZE = 2
+
     print_config(cfg)
 
     output_path = FLAGS.output_path
-    #mask_path = FLAGS.mask_path
     if not os.path.isdir(output_path):
         os.mkdir(output_path)
-    #if not os.path.isdir(mask_path):
-        #os.mkdir(mask_path)
 
     logger = log_helper.get_logger()
-    if FLAGS.model == 'sq':
-        model = SQSegNet(cfg, logger)
-    elif FLAGS.model == 'erf':
-        model = ERFSegNet(cfg, logger)
+    if FLAGS.model == 'res50':
+        model = Res50DispNet(cfg, logger)
+    else:
+        logger.error('wrong model type: {}'.format(FLAGS.model))
+        sys.exit(-1)
 
     # get moving avg
-    variable_averages = tf.train.ExponentialMovingAverage(cfg.MOVING_AVERAGE_DECAY)
-    variables_to_restore = variable_averages.variables_to_restore()
-    
-    if FLAGS.debug:
-        print(variables_to_restore.keys())
-        print('======================================================')
-        print(variables_to_restore)
-        print('======================================================')
-        print([x.name for x in model.all_variables])
-        print('======================================================')
-        print(model.all_variables)
-        saver = tf.train.Saver(model.all_variables)
-        with tf.Session() as sess:
-            # restore model
-            logger.info("restoring model ......")
-            saver.restore(sess, FLAGS.ckpt_path)
-            with tf.variable_scope('', reuse=True):
-                print(FLAGS.dbg_tname)
-                debug_variable = tf.get_variable(FLAGS.dbg_tname)
-                debug_variable_shape = tf.shape(debug_variable)
-                print(debug_variable.eval(sess))
-                print(debug_variable_shape.eval(session=sess))
-
-    else:
+    if FLAGS.use_avg:
+        variable_averages = tf.train.ExponentialMovingAverage(cfg.MOVING_AVERAGE_DECAY)
+        variables_to_restore = variable_averages.variables_to_restore()
         saver = tf.train.Saver(variables_to_restore)
-        #saver = tf.train.Saver(model.all_variables)
+    else:
+        saver = tf.train.Saver(model.all_variables)
 
-        with tf.Session() as sess:
-            # restore model
-            logger.info("restoring model ......")
-            saver.restore(sess, FLAGS.ckpt_path)
-            total_time_elapsed = 0.0
+    total_time_elapsed = 0
+    with tf.Session() as sess:
+        # restore model
+        logger.info("restoring model ......")
+        saver.restore(sess, FLAGS.ckpt_path)
 
-            for image, label, fname in instance_label_generator(FLAGS.sample_path, FLAGS.label_path):
-                logger.info("testing for {}".format(fname))
+        rmse_list     = []
+        rmse_log_list = []
+        abs_rel_list  = []
+        sq_rel_list   = []
+        d1_all_list   = []
+        a1_list       = []
+        a2_list       = []
+        a3_list       = []
 
-                begin_ts = time.time()
-                feed_dict = {
-                    model.input_image: [image],
-                    model.train_phase: True
-                }
+        for image, label, fname in instance_label_generator(FLAGS.sample_path, FLAGS.label_path,
+                                                            cfg.IMAGE_WIDTH, cfg.IMAGE_HEIGHT):
+            logger.info("testing for {}".format(fname))
 
-                prediction = sess.run(model.output, feed_dict=feed_dict)
 
-                end_ts = time.time()
-                logger.info("cost time: {} s".format(end_ts - begin_ts))
-                total_time_elapsed += end_ts - begin_ts
-                mean_iu, iu = per_class_iu(prediction, [label])
-                logger.info('mean IU = {}'.format(mean_iu))
-                for i in range(cfg.NUM_CLASSES):
-                    logger.info('class #{} iu = {}'.format(i, iu[i]))
+            begin_ts = time.time()
+            feed_dict = {
+                model.left_image: image
+            }
 
-                # output_image to verify
-                output_fname = output_path + "/" + os.path.basename(fname)
-                pred_prob = genPredProb(prediction[0])
-                ret = cv2.imwrite(output_fname, pred_prob)
-                if not ret:
-                    logger.error('writing image to {} failed!'.format(output_fname))
-                    sys.exit(-1)
+            pre_disp = sess.run(model.left_disparity[0], feed_dict=feed_dict)
 
-                # masking image
-                #mask_fname = mask_path + "/" + os.path.basename(fname)
-                #r, g, b = cv2.split(image.astype(np.uint8))
-                #cv_img = cv2.merge([b, g, r])
-                #masked = image_process.prob_mask(cv_img, pred_prob)
-                #ret = cv2.imwrite(mask_fname, masked)
-                #if not ret:
-                    #logger.error('writing image to {} failed!'.format(output_fname))
-                    #sys.exit(-1)
+            end_ts = time.time()
+            logger.info("cost time: {} s".format(end_ts - begin_ts))
+            total_time_elapsed += end_ts - begin_ts
 
-            print("total time elapsed: {} s".format(total_time_elapsed))
+            disp = pre_disp[0].squeeze()
+            disp_pp = post_process_disparity(pre_disp.squeeze())
+
+            width = label.shape[1]
+            focal = KITTI_FOCAL[width]
+            base = KITTI_BASE
+            d1_all, abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3 = depth_metrics(label, disp, focal, base)
+
+            print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('abs_rel', 'sq_rel', 'rmse', 'rmse_log', 'd1_all', 'a1', 'a2', 'a3'))
+            print("{:10.4f}, {:10.4f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}".format(abs_rel, sq_rel, rmse, rmse_log, d1_all, a1, a2, a3))
+
+            rmse_list.append(rmse)
+            rmse_log_list.append(rmse_log)
+            abs_rel_list.append(abs_rel)
+            sq_rel_list.append(sq_rel)
+            d1_all_list.append(d1_all)
+            a1_list.append(a1)
+            a2_list.append(a2)
+            a3_list.append(a3)
+
+            # output_image to verify
+            output_fname = output_path + "/" + os.path.basename(fname)
+            output_pp_fname = output_path + "/pp_" + os.path.basename(fname)
+            plt.imsave(output_fname, disp, cmap=plt.cm.gray)
+            plt.imsave(output_pp_fname, disp_pp, cmap=plt.cm.gray)
+
+        rmse_mean = np.array(rmse_list).mean()
+        rmse_log_mean = np.array(rmse_log_list).mean()
+        abs_rel_mean = np.array(abs_rel_list).mean()
+        sq_rel_mean = np.array(sq_rel_list).mean()
+        d1_all_mean = np.array(d1_all_list).mean()
+        a1_mean = np.array(a1_list).mean()
+        a2_mean = np.array(a2_list).mean()
+        a3_mean = np.array(a3_list).mean()
+        print("============total metric============")
+        print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('abs_rel', 'sq_rel', 'rmse', 'rmse_log', 'd1_all', 'a1', 'a2', 'a3'))
+        print("{:10.4f}, {:10.4f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}".format(abs_rel_mean, sq_rel_mean, rmse_mean, rmse_log_mean, d1_all_mean, a1_mean, a2_mean, a3_mean))
+
+        print("total time elapsed: {} s".format(total_time_elapsed))
 
 
 if __name__ == '__main__':

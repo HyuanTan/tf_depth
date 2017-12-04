@@ -8,7 +8,7 @@ import numpy as np
 np.set_printoptions(threshold=np.nan)
 
 from nets.res50_disp_net import Res50DispNet
-from data.data_loader import TFLoadingPipeline, LoadingPipeline
+from data.data_loader import TFLoadingPipeline
 from config import cfg
 from utils.training_utils import get_train_op, add_summaries, add_metric_summary
 from utils.config_utils import cfg_from_file, print_config
