@@ -36,14 +36,20 @@ cfg.GRAD_SUMMARY = True
 # model params
 cfg.SCALE_NUM = 4
 cfg.DISP_FACTOR = 0.3
+
+cfg.USE_SSIM = True
 cfg.ALPHA_IMAGE_LOSS = 0.85
+
 cfg.SMOOTH_LOSS_WEIGHT = 0.1
+
+cfg.USE_CONSIST = True
 cfg.CONSIST_LOSS_WEIGHT = 1.0
+
+cfg.DO_STEREO = True
 
 # image config
 cfg.IMAGE_HEIGHT = 256
 cfg.IMAGE_WIDTH = 512
 cfg.IMAGE_DEPTH = 3
 
-cfg.SUBTRACT_CHANNEL_MEAN = False
 

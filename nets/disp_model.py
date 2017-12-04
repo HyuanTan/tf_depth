@@ -38,14 +38,15 @@ class DispModel(BaseModel):
             self._right_recon = [self._generate_image_right(self._left_pyramid[i], self._disp_right[i], name='right{}'.format(i)) for i in range(self._cfg.SCALE_NUM)]
 
         # lr consistency
-        with tf.variable_scope('left-right'):
-            self._right_to_left_disp = [self._generate_image_left(self._disp_right[i], self._disp_left[i], name='right_to_left{}'.format(i))  for i in range(self._cfg.SCALE_NUM)]
-            self._left_to_right_disp = [self._generate_image_right(self._disp_left[i], self._disp_right[i], name='left_to_right{}'.format(i)) for i in range(self._cfg.SCALE_NUM)]
+        if self._cfg.USE_CONSIST:
+            with tf.variable_scope('left-right'):
+                right_to_left_disp = [self._generate_image_left(self._disp_right[i], self._disp_left[i], name='right_to_left{}'.format(i))  for i in range(self._cfg.SCALE_NUM)]
+                left_to_right_disp = [self._generate_image_right(self._disp_left[i], self._disp_right[i], name='left_to_right{}'.format(i)) for i in range(self._cfg.SCALE_NUM)]
 
         # disparity smoothness
         with tf.variable_scope('smoothness'):
-            self._disp_left_smoothness  = self._get_disparity_smoothness(self._disp_left,  self._left_pyramid, name='left')
-            self._disp_right_smoothness = self._get_disparity_smoothness(self._disp_right, self._right_pyramid, name='right')
+            disp_left_smoothness  = self._get_disparity_smoothness(self._disp_left,  self._left_pyramid, name='left')
+            disp_right_smoothness = self._get_disparity_smoothness(self._disp_right, self._right_pyramid, name='right')
 
         # start calculating losses
         self._losses = []
@@ -62,30 +63,32 @@ class DispModel(BaseModel):
         image_l1_loss = tf.add_n(l1_reconstruction_loss_left + l1_reconstruction_loss_right)
 
         # SSIM
-        with tf.variable_scope('recon_ssim_loss'):
-            ssim_left = [self._SSIM( self._left_recon[i],  self._left_pyramid[i]) for i in range(self._cfg.SCALE_NUM)]
-            ssim_loss_left = [tf.reduce_mean(s, name='left{}'.format(i)) for i,s in enumerate(ssim_left)]
-            ssim_right = [self._SSIM(self._right_recon[i], self._right_pyramid[i]) for i in range(self._cfg.SCALE_NUM)]
-            ssim_loss_right = [tf.reduce_mean(s, name='right{}'.format(i)) for i,s in enumerate(ssim_right)]
+        if self._cfg.USE_SSIM:
+            with tf.variable_scope('recon_ssim_loss'):
+                ssim_left = [self._SSIM( self._left_recon[i],  self._left_pyramid[i]) for i in range(self._cfg.SCALE_NUM)]
+                ssim_loss_left = [tf.reduce_mean(s, name='left{}'.format(i)) for i,s in enumerate(ssim_left)]
+                ssim_right = [self._SSIM(self._right_recon[i], self._right_pyramid[i]) for i in range(self._cfg.SCALE_NUM)]
+                ssim_loss_right = [tf.reduce_mean(s, name='right{}'.format(i)) for i,s in enumerate(ssim_right)]
 
-        self._losses += ssim_loss_left + ssim_loss_right
-        image_ssim_loss = tf.add_n(ssim_loss_left + ssim_loss_right)
+            self._losses += ssim_loss_left + ssim_loss_right
+            image_ssim_loss = tf.add_n(ssim_loss_left + ssim_loss_right)
 
         # DISPARITY SMOOTHNESS
         with tf.variable_scope('smoothness_loss'):
-            smooth_left_loss  = [tf.multiply(tf.reduce_mean(tf.abs(self._disp_left_smoothness[i])) + tf.reduce_mean(tf.abs(self._disp_left_smoothness[i+self._cfg.SCALE_NUM])),
+            smooth_left_loss  = [tf.multiply(tf.reduce_mean(tf.abs(disp_left_smoothness[i])) + tf.reduce_mean(tf.abs(disp_left_smoothness[i+self._cfg.SCALE_NUM])),
                                              1.0/2**i, name='left{}'.format(i)) for i in range(self._cfg.SCALE_NUM)]
-            smooth_right_loss = [tf.multiply(tf.reduce_mean(tf.abs(self._disp_right_smoothness[i])) + tf.reduce_mean(tf.abs(self._disp_right_smoothness[i+self._cfg.SCALE_NUM])),
+            smooth_right_loss = [tf.multiply(tf.reduce_mean(tf.abs(disp_right_smoothness[i])) + tf.reduce_mean(tf.abs(disp_right_smoothness[i+self._cfg.SCALE_NUM])),
                                              1.0/2**i, name='right{}'.format(i)) for i in range(self._cfg.SCALE_NUM)]
 
         self._losses += smooth_left_loss + smooth_right_loss
 
         # CONSISTENCY
-        with tf.variable_scope('consistency_loss'):
-            consist_left_loss  = [tf.reduce_mean(tf.abs(self._right_to_left_disp[i] - self._disp_left[i]), name='left{}'.format(i)) for i in range(self._cfg.SCALE_NUM)]
-            consist_right_loss = [tf.reduce_mean(tf.abs(self._left_to_right_disp[i] - self._disp_right[i]), name='right{}'.format(i)) for i in range(self._cfg.SCALE_NUM)]
+        if self._cfg.USE_CONSIST:
+            with tf.variable_scope('consistency_loss'):
+                consist_left_loss  = [tf.reduce_mean(tf.abs(right_to_left_disp[i] - self._disp_left[i]), name='left{}'.format(i)) for i in range(self._cfg.SCALE_NUM)]
+                consist_right_loss = [tf.reduce_mean(tf.abs(left_to_right_disp[i] - self._disp_right[i]), name='right{}'.format(i)) for i in range(self._cfg.SCALE_NUM)]
 
-        self._losses += consist_left_loss + consist_right_loss
+            self._losses += consist_left_loss + consist_right_loss
 
         # MODEL LOSS
         with tf.variable_scope('model_loss'):
@@ -97,10 +100,14 @@ class DispModel(BaseModel):
                 self._model_losses.append(regularize_loss)
 
             # WEIGTHED SUM IMAGE LOSS
-            image_loss_right = [self._cfg.ALPHA_IMAGE_LOSS * ssim_loss_right[i] + (1 - self._cfg.ALPHA_IMAGE_LOSS) * l1_reconstruction_loss_right[i] for i in range(self._cfg.SCALE_NUM)]
-            image_loss_left  = [self._cfg.ALPHA_IMAGE_LOSS * ssim_loss_left[i]  + (1 - self._cfg.ALPHA_IMAGE_LOSS) * l1_reconstruction_loss_left[i]  for i in range(self._cfg.SCALE_NUM)]
+            if self._cfg.USE_SSIM:
+                image_loss_right = [self._cfg.ALPHA_IMAGE_LOSS * ssim_loss_right[i] + (1 - self._cfg.ALPHA_IMAGE_LOSS) * l1_reconstruction_loss_right[i] for i in range(self._cfg.SCALE_NUM)]
+                image_loss_left  = [self._cfg.ALPHA_IMAGE_LOSS * ssim_loss_left[i]  + (1 - self._cfg.ALPHA_IMAGE_LOSS) * l1_reconstruction_loss_left[i]  for i in range(self._cfg.SCALE_NUM)]
 
-            image_loss = tf.add_n(image_loss_left + image_loss_right, name='image_loss')
+                image_loss = tf.add_n(image_loss_left + image_loss_right, name='image_loss')
+            else:
+                image_loss = tf.add_n(l1_reconstruction_loss_left + l1_reconstruction_loss_right, name='image_loss')
+
             tf.add_to_collection(self._loss_collection, image_loss)
 
             # WEIGTHED SUM SMOOTHNESS LOSS
@@ -108,8 +115,9 @@ class DispModel(BaseModel):
             tf.add_to_collection(self._loss_collection, self._cfg.SMOOTH_LOSS_WEIGHT * smooth_loss)
 
             # WEIGTHED SUM CONSISTENCY LOSS
-            consist_loss = tf.add_n(consist_left_loss + consist_right_loss, name='consist_loss')
-            tf.add_to_collection(self._loss_collection, self._cfg.CONSIST_LOSS_WEIGHT * consist_loss)
+            if self._cfg.USE_CONSIST:
+                consist_loss = tf.add_n(consist_left_loss + consist_right_loss, name='consist_loss')
+                tf.add_to_collection(self._loss_collection, self._cfg.CONSIST_LOSS_WEIGHT * consist_loss)
 
             # TOTAL LOSS
             self._total_loss = tf.add_n(tf.get_collection(self._loss_collection), name='total_loss')
@@ -214,22 +222,6 @@ class DispModel(BaseModel):
     @property
     def right_reconstruction(self):
         return self._right_recon
-
-    @property
-    def right_to_left_disp(self):
-        return self._right_to_left_disp
-
-    @property
-    def left_to_right_disp(self):
-        return self._left_to_right_disp
-
-    @property
-    def left_disp_smoothness(self):
-        return self._disp_left_smoothness
-
-    @property
-    def right_disp_smoothness(self):
-        return self._disp_right_smoothness
 
     @property
     def left_recon_diff(self):

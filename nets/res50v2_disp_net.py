@@ -1,10 +1,10 @@
 import tensorflow as tf
 from disp_model import DispModel
-from utils.building_blocks import deconv_layer_with_bn, get_deconv_output_fmap_shape, resbottle, upsample_layer, upconv_layer_with_bn, conv_layer_with_bn, merge_skip
+from utils.building_blocks import deconv_layer_with_bn, get_deconv_output_fmap_shape, resbottlev2, upsample_layer, upconv_layer_with_bn, conv_layer_with_bn, merge_skip
 from utils.variable_utils import orthogonal_initializer, msra_initializer
 
 
-class Res50DispNet(DispModel):
+class Res50v2DispNet(DispModel):
     def __init__(self, cfg, logger):
         super(Res50DispNet, self).__init__(cfg, logger)
 
@@ -19,8 +19,7 @@ class Res50DispNet(DispModel):
         # conv7X7_1 H/2
         self._logger.info("l1_conv input shape: [" + ','.join([str(x) for x in in_shape]) + ']')
         net = conv_layer_with_bn(inputT, [7,7,in_shape[3],64], 2, initializer=msra_initializer(),
-                                 wd=cfg.WEIGHT_DECAY, use_bn=cfg.USE_BN, is_training=self._is_training, 
-                                 bn_decay=cfg.BN_DECAY, act_fn=tf.nn.elu, loss_collection=self._loss_collection,
+                                 wd=cfg.WEIGHT_DECAY, loss_collection=self._loss_collection,
                                  name='l1_conv')
 
         self._layers.append(net)
@@ -37,122 +36,122 @@ class Res50DispNet(DispModel):
         skip_layers.append(net)
 
         # resbottle_3 H/4
-        net, net1, net2, net3 = resbottle(net, 64, 64, 256, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 64, 64, 256, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l3_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_4 H/4
-        net, net1, net2, net3 = resbottle(net, 64, 64, 256, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 64, 64, 256, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l4_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_5 H/8
-        net, net1, net2, net3 = resbottle(net, 64, 64, 256, 2, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 64, 64, 256, 2, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l5_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         skip_layers.append(net)
 
         # resbottle_6 H/8
-        net, net1, net2, net3 = resbottle(net, 128, 128, 512, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 128, 128, 512, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l6_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_7 H/8
-        net, net1, net2, net3 = resbottle(net, 128, 128, 512, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 128, 128, 512, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l7_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_8 H/8
-        net, net1, net2, net3 = resbottle(net, 128, 128, 512, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 128, 128, 512, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l8_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_9 H/16
-        net, net1, net2, net3 = resbottle(net, 128, 128, 512, 2, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 128, 128, 512, 2, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l9_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         skip_layers.append(net)
 
         # resbottle_10 H/16
-        net, net1, net2, net3 = resbottle(net, 256, 256, 1024, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 256, 256, 1024, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l10_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_11 H/16
-        net, net1, net2, net3 = resbottle(net, 256, 256, 1024, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 256, 256, 1024, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l11_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_12 H/16
-        net, net1, net2, net3 = resbottle(net, 256, 256, 1024, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 256, 256, 1024, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l12_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_13 H/16
-        net, net1, net2, net3 = resbottle(net, 256, 256, 1024, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 256, 256, 1024, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l13_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_14 H/16
-        net, net1, net2, net3 = resbottle(net, 256, 256, 1024, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 256, 256, 1024, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l14_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_15 H/32
-        net, net1, net2, net3 = resbottle(net, 256, 256, 1024, 2, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 256, 256, 1024, 2, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l15_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         skip_layers.append(net)
 
         # resbottle_16 H/32
-        net, net1, net2, net3 = resbottle(net, 512, 512, 2048, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 512, 512, 2048, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l16_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_17 H/32
-        net, net1, net2, net3 = resbottle(net, 512, 512, 2048, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 512, 512, 2048, 1, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l17_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         # resbottle_18 H/64
-        net, net1, net2, net3 = resbottle(net, 512, 512, 2048, 2, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
+        net = resbottlev2(net, 512, 512, 2048, 2, initializer=msra_initializer(), wd=cfg.WEIGHT_DECAY,
                         use_bn=cfg.USE_BN, is_training=self._is_training, bn_decay=cfg.BN_DECAY,
                         use_dropout=cfg.USE_DROPOUT, drop_rate=cfg.DROP_RATE, act_fn=tf.nn.elu,
                         loss_collection=self._loss_collection, name='l18_resbottle')
-        self._layers += [net, net1, net2, net3]
+        self._layers.append(net)
 
         return net, skip_layers
 

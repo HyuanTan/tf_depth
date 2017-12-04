@@ -86,7 +86,7 @@ def main(args):
             nan_checks.append(tf.is_nan(grad))
 
         layers = model.layers[-8:]
-        layers += model.left_reconstruction + model.right_reconstruction + model.right_to_left_disp + model.left_to_right_disp + model.left_disp_smoothness + model.right_disp_smoothness + model.left_disp_smoothness + model.right_disp_smoothness
+        layers += model.left_reconstruction + model.right_reconstruction + model.left_disparity + model.right_disparity
         if cfg.WEIGHT_DECAY is not None:
             _, img_loss, img_l1_loss, img_ssim_loss, smth_loss, cons_loss, total_loss = model.model_losses
         else:
