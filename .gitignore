@@ -1,0 +1,6 @@
+# Compiled Object files
+*.pyc
+
+# vim swap files
+*.swp
+*.swo
