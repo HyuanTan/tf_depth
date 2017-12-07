@@ -105,11 +105,14 @@ def main(args):
         for image, label, fname in instance_label_generator(FLAGS.sample_path, FLAGS.label_path,
                                                             cfg.IMAGE_WIDTH, cfg.IMAGE_HEIGHT, FLAGS.do_pp, stereo_path):
             if cfg.DO_STEREO:
+                sample_name = fname[0]
+                stereo_name = fname[1]
                 logger.info("testing for {} & {}".format(fname[0], fname[1]))
                 feed_dict = {
                     model.left_image: image[0],
                     model.right_image: image[1]
                 }
+                fname = sample_name
             else:
                 logger.info("testing for {}".format(fname))
                 feed_dict = {
