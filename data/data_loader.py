@@ -52,26 +52,59 @@ def instance_generator(sample_path, width, height, do_pp=True):
 
         yield (img_batch, fname)
 
-def instance_label_generator(sample_path, label_path, width, height, do_pp=True):
+def instance_label_generator(sample_path, label_path, width, height, do_pp=True, stereo_path=None):
     image_fnames, label_fnames = get_filename_list(sample_path, label_path)
 
-    for fname, label_fname in zip(image_fnames, label_fnames):
-        img = cv2.imread(fname)
-        shape = img.shape
-        if shape[0] != height or shape[1] != width:
-            img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
-        b,g,r = cv2.split(img)
-        img = cv2.merge([r,g,b])
-        img = img.astype(np.float32) / 255.0
-        if do_pp:
-            img_flip = np.fliplr(img)
-            img_batch = np.stack([img, img_flip], axis=0)
-        else:
-            img_batch = np.expand_dims(img, axis=0)
+    if stereo_path is None:
+        for fname, label_fname in zip(image_fnames, label_fnames):
+            img = cv2.imread(fname)
+            shape = img.shape
+            if shape[0] != height or shape[1] != width:
+                img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
+            b,g,r = cv2.split(img)
+            img = cv2.merge([r,g,b])
+            img = img.astype(np.float32) / 255.0
+            if do_pp:
+                img_flip = np.fliplr(img)
+                img_batch = np.stack([img, img_flip], axis=0)
+            else:
+                img_batch = np.expand_dims(img, axis=0)
 
-        label = cv2.imread(label_fname, -1)
-        label = label.astype(np.float32) / 256      # for KITTI disp image
-        yield (img_batch, label, fname)
+            label = cv2.imread(label_fname, -1)
+            label = label.astype(np.float32) / 256      # for KITTI disp image
+            yield (img_batch, label, fname)
+    else:
+        stereo_fnames, _ = get_filename_list(stereo_path, None)
+        for fname, sfname, label_fname in zip(image_fnames, stereo_fnames, label_fnames):
+            img = cv2.imread(fname)
+            simg = cv2.imread(sfname)
+            shape = img.shape
+            if shape[0] != height or shape[1] != width:
+                img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
+                simg = cv2.resize(simg, (width, height), 0, 0, cv2.INTER_AREA)
+
+            b,g,r = cv2.split(img)
+            img = cv2.merge([r,g,b])
+            img = img.astype(np.float32) / 255.0
+
+            b,g,r = cv2.split(simg)
+            simg = cv2.merge([r,g,b])
+            simg = simg.astype(np.float32) / 255.0
+
+            if do_pp:
+                img_flip = np.fliplr(img)
+                img_batch = np.stack([img, img_flip], axis=0)
+
+                simg_flip = np.fliplr(simg)
+                simg_batch = np.stack([simg, simg_flip], axis=0)
+            else:
+                img_batch = np.expand_dims(img, axis=0)
+                simg_batch = np.expand_dims(simg, axis=0)
+
+            label = cv2.imread(label_fname, -1)
+            label = label.astype(np.float32) / 256      # for KITTI disp image
+            yield ((img_batch, simg_batch), label, (fname, sfname))
+
 
 class LoadingPipeline(object):
 

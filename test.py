@@ -21,7 +21,8 @@ tf.app.flags.DEFINE_string('model', 'res50', """ which model to use """)
 tf.app.flags.DEFINE_string('ckpt_path', '', """ path to restore model ckpt """)
 tf.app.flags.DEFINE_string('cfg_file', '', """ experimental config file """)
 tf.app.flags.DEFINE_string('sample_path', '', """ path to sample image """)
-tf.app.flags.DEFINE_string('label_path', '', """ path to sample image """)
+tf.app.flags.DEFINE_string('label_path', '', """ path to labels """)
+tf.app.flags.DEFINE_string('stereo_path', '', """ path to stereo image """)
 tf.app.flags.DEFINE_string('output_path', '', """ path to validate label image """)
 tf.app.flags.DEFINE_boolean('use_avg', True, """ whether to use moving average model """)
 tf.app.flags.DEFINE_boolean('do_pp', True, """ whether to do post processing """)
@@ -99,15 +100,23 @@ def main(args):
         a2_list       = []
         a3_list       = []
 
-        for image, label, fname in instance_label_generator(FLAGS.sample_path, FLAGS.label_path,
-                                                            cfg.IMAGE_WIDTH, cfg.IMAGE_HEIGHT, FLAGS.do_pp):
-            logger.info("testing for {}".format(fname))
+        stereo_path = FLAGS.stereo_path if cfg.DO_STEREO else None
 
+        for image, label, fname in instance_label_generator(FLAGS.sample_path, FLAGS.label_path,
+                                                            cfg.IMAGE_WIDTH, cfg.IMAGE_HEIGHT, FLAGS.do_pp, stereo_path):
+            if cfg.DO_STEREO:
+                logger.info("testing for {} & {}".format(fname[0], fname[1]))
+                feed_dict = {
+                    model.left_image: image[0]
+                    model.right_image: image[1]
+                }
+            else:
+                logger.info("testing for {}".format(fname))
+                feed_dict = {
+                    model.left_image: image
+                }
 
             begin_ts = time.time()
-            feed_dict = {
-                model.left_image: image
-            }
 
             pre_disp = sess.run(model.left_disparity[0], feed_dict=feed_dict)
 
