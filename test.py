@@ -107,7 +107,7 @@ def main(args):
             if cfg.DO_STEREO:
                 logger.info("testing for {} & {}".format(fname[0], fname[1]))
                 feed_dict = {
-                    model.left_image: image[0]
+                    model.left_image: image[0],
                     model.right_image: image[1]
                 }
             else:
