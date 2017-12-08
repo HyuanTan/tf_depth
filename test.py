@@ -127,7 +127,7 @@ def main(args):
             logger.info("cost time: {} s".format(end_ts - begin_ts))
             total_time_elapsed += end_ts - begin_ts
 
-            if FLAGS.do_pp:
+            if FLAGS.do_pp and not cfg.DO_STEREO:
                 disp = post_process_disparity(pre_disp.squeeze())
             else:
                 disp = pre_disp[0].squeeze()
@@ -151,7 +151,7 @@ def main(args):
 
             # output_image to verify
             if FLAGS.output_path != '':
-                if FLAGS.do_pp:
+                if FLAGS.do_pp and not cfg.DO_STEREO:
                     output_fname = output_path + "/pp_" + os.path.basename(fname)
                 else:
                     output_fname = output_path + "/" + os.path.basename(fname)
