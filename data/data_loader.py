@@ -91,15 +91,10 @@ def instance_label_generator(sample_path, label_path, width, height, do_pp=True,
             simg = cv2.merge([r,g,b])
             simg = simg.astype(np.float32) / 255.0
 
-            if do_pp:
-                img_flip = np.fliplr(img)
-                img_batch = np.stack([img, img_flip], axis=0)
-
-                simg_flip = np.fliplr(simg)
-                simg_batch = np.stack([simg, simg_flip], axis=0)
-            else:
-                img_batch = np.expand_dims(img, axis=0)
-                simg_batch = np.expand_dims(simg, axis=0)
+            # for stereo, no need to post process, since the flipping
+            # would cause the swapping of the left/right in stereo pair
+            img_batch = np.expand_dims(img, axis=0)
+            simg_batch = np.expand_dims(simg, axis=0)
 
             label = cv2.imread(label_fname, -1)
             label = label.astype(np.float32) / 256      # for KITTI disp image
@@ -280,27 +275,27 @@ class TFLoadingPipeline(object):
 
             # adjust brightness
             do_bright = tf.random_uniform([], 0, 1)
-            factor = tf.random_uniform([], -0.3, 0.3)
-            image  = tf.cond(do_bright > 0.5, lambda: tf.image.adjust_brightness(image, factor), lambda: image)
-            label  = tf.cond(do_bright > 0.5, lambda: tf.image.adjust_brightness(label, factor), lambda: label)
+            bri_factor = tf.random_uniform([], -0.3, 0.3)
+            image  = tf.cond(do_bright > 0.5, lambda: tf.image.adjust_brightness(image, bri_factor), lambda: image)
+            label  = tf.cond(do_bright > 0.5, lambda: tf.image.adjust_brightness(label, bri_factor), lambda: label)
 
             # adjust contrast
             do_contrast = tf.random_uniform([], 0, 1)
-            factor = tf.random_uniform([], 0.2, 1.8)
-            image  = tf.cond(do_contrast > 0.5, lambda: tf.image.adjust_contrast(image, factor), lambda: image)
-            label  = tf.cond(do_contrast > 0.5, lambda: tf.image.adjust_contrast(label, factor), lambda: label)
+            con_factor = tf.random_uniform([], 0.2, 1.8)
+            image  = tf.cond(do_contrast > 0.5, lambda: tf.image.adjust_contrast(image, con_factor), lambda: image)
+            label  = tf.cond(do_contrast > 0.5, lambda: tf.image.adjust_contrast(label, con_factor), lambda: label)
 
             # adjust saturation
             do_saturation = tf.random_uniform([], 0, 1)
-            factor = tf.random_uniform([], 0.2, 1.8)
-            image  = tf.cond(do_saturation > 0.5, lambda: tf.image.adjust_saturation(image, factor), lambda: image)
-            label  = tf.cond(do_saturation > 0.5, lambda: tf.image.adjust_saturation(label, factor), lambda: label)
+            sat_factor = tf.random_uniform([], 0.2, 1.8)
+            image  = tf.cond(do_saturation > 0.5, lambda: tf.image.adjust_saturation(image, sat_factor), lambda: image)
+            label  = tf.cond(do_saturation > 0.5, lambda: tf.image.adjust_saturation(label, sat_factor), lambda: label)
 
             # adjust hue
             do_hue = tf.random_uniform([], 0, 1)
-            factor = tf.random_uniform([], -0.1, 0.1)
-            image  = tf.cond(do_hue > 0.5, lambda: tf.image.adjust_hue(image, factor), lambda: image)
-            label  = tf.cond(do_hue > 0.5, lambda: tf.image.adjust_hue(label, factor), lambda: label)
+            hue_factor = tf.random_uniform([], -0.1, 0.1)
+            image  = tf.cond(do_hue > 0.5, lambda: tf.image.adjust_hue(image, hue_factor), lambda: image)
+            label  = tf.cond(do_hue > 0.5, lambda: tf.image.adjust_hue(label, hue_factor), lambda: label)
 
 
         self._logger.info('Filling queue with %d images before starting the pipeline. '

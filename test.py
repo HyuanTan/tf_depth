@@ -60,7 +60,7 @@ def main(args):
         print('loading config setting')
         cfg_from_file(FLAGS.cfg_file, cfg)
     cfg.BATCH_SIZE = 1
-    if FLAGS.do_pp:
+    if FLAGS.do_pp and not cfg.DO_STEREO:
         cfg.BATCH_SIZE = 2
 
     print_config(cfg)
