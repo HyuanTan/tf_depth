@@ -227,12 +227,12 @@ def main(args):
 
                 start_time = time.time()
             # every 100 step, do validation & write summary
-            if not FLAGS.debug and step and step % 500 == 0:
+            if not FLAGS.debug and step % 500 == 0:
                 # write summary
                 #summary_str = sess.run(summary_op, feed_dict=feed_dict)
                 summary_writer.add_summary(summary_str, step)
 
-                if cfg.DO_VALIDATE:
+                if cfg.DO_VALIDATE and step:
                     logger.info('start validating......')
                     total_val_loss = 0.0
                     for test_step in range(val_step):
