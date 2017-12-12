@@ -173,14 +173,17 @@ class DispModel(BaseModel):
 
     def _scale_pyramid(self, img):
         scaled_imgs = [img]
-        s = tf.shape(img)
+        s = img.get_shape().as_list()
+        self._logger.info("scale pyramid shapes:")
         h = s[1]
         w = s[2]
+        self._logger.info("scale #0: [{}, {}]".format(h, w))
         for i in range(self._cfg.SCALE_NUM - 1):
-            ratio = 2 ** (i + 1)
-            nh = h / ratio
-            nw = w / ratio
-            scaled_imgs.append(tf.image.resize_area(img, [nh, nw]))
+            h = int(np.ceil(h / 2.0))
+            w = int(np.ceil(w / 2.0))
+            self._logger.info("scale #{}: [{}, {}]".format(i+1, h, w))
+
+            scaled_imgs.append(tf.image.resize_area(img, [h, w]))
         return scaled_imgs
 
     @property

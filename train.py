@@ -227,7 +227,7 @@ def main(args):
 
                 start_time = time.time()
             # every 100 step, do validation & write summary
-            if not FLAGS.debug and step and step % 100 == 0:
+            if not FLAGS.debug and step and step % 500 == 0:
                 # write summary
                 #summary_str = sess.run(summary_op, feed_dict=feed_dict)
                 summary_writer.add_summary(summary_str, step)
