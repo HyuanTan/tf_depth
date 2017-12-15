@@ -91,6 +91,15 @@ def main(args):
         logger.info("restoring model ......")
         saver.restore(sess, FLAGS.ckpt_path)
 
+        rate_list     = []
+        rmse_inter_list     = []
+        rmse_log_inter_list = []
+        abs_rel_inter_list  = []
+        sq_rel_inter_list   = []
+        d1_all_inter_list   = []
+        a1_inter_list       = []
+        a2_inter_list       = []
+        a3_inter_list       = []
         rmse_list     = []
         rmse_log_list = []
         abs_rel_list  = []
@@ -135,11 +144,20 @@ def main(args):
             width = label.shape[1]
             focal = KITTI_FOCAL[width]
             base = KITTI_BASE
-            d1_all, abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3 = depth_metrics(label, disp, focal, base)
+            rate, d1_all_inter, abs_rel_inter, sq_rel_inter, rmse_inter, rmse_log_inter, a1_inter, a2_inter, a3_inter, d1_all, abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3 = depth_metrics(label, disp, focal, base)
 
-            print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('abs_rel', 'sq_rel', 'rmse', 'rmse_log', 'd1_all', 'a1', 'a2', 'a3'))
-            print("{:10.4f}, {:10.4f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}".format(abs_rel, sq_rel, rmse, rmse_log, d1_all, a1, a2, a3))
+            print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('ratio', 'abs_rel_i', 'sq_rel_i', 'rmse_i', 'rmse_log_i', 'd1_all_i', 'a1_i', 'a2_i', 'a3_i', 'abs_rel', 'sq_rel', 'rmse', 'rmse_log', 'd1_all', 'a1', 'a2', 'a3'))
+            print("{:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}".format(rate, abs_rel_inter, sq_rel_inter, rmse_inter, rmse_log_inter, d1_all_inter, a1_inter, a2_inter, a3_inter, abs_rel, sq_rel, rmse, rmse_log, d1_all, a1, a2, a3))
 
+            rate_list.append(rate)
+            rmse_inter_list.append(rmse_inter)
+            rmse_log_inter_list.append(rmse_log_inter)
+            abs_rel_inter_list.append(abs_rel_inter)
+            sq_rel_inter_list.append(sq_rel_inter)
+            d1_all_inter_list.append(d1_all_inter)
+            a1_inter_list.append(a1_inter)
+            a2_inter_list.append(a2_inter)
+            a3_inter_list.append(a3_inter)
             rmse_list.append(rmse)
             rmse_log_list.append(rmse_log)
             abs_rel_list.append(abs_rel)
@@ -157,6 +175,15 @@ def main(args):
                     output_fname = output_path + "/" + os.path.basename(fname)
                 plt.imsave(output_fname, disp, cmap=plt.cm.gray)
 
+        rate_mean = np.array(rate_list).mean()
+        rmse_inter_mean = np.array(rmse_inter_list).mean()
+        rmse_log_inter_mean = np.array(rmse_log_inter_list).mean()
+        abs_rel_inter_mean = np.array(abs_rel_inter_list).mean()
+        sq_rel_inter_mean = np.array(sq_rel_inter_list).mean()
+        d1_all_inter_mean = np.array(d1_all_inter_list).mean()
+        a1_inter_mean = np.array(a1_inter_list).mean()
+        a2_inter_mean = np.array(a2_inter_list).mean()
+        a3_inter_mean = np.array(a3_inter_list).mean()
         rmse_mean = np.array(rmse_list).mean()
         rmse_log_mean = np.array(rmse_log_list).mean()
         abs_rel_mean = np.array(abs_rel_list).mean()
@@ -165,9 +192,10 @@ def main(args):
         a1_mean = np.array(a1_list).mean()
         a2_mean = np.array(a2_list).mean()
         a3_mean = np.array(a3_list).mean()
+
         print("============total metric============")
-        print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('abs_rel', 'sq_rel', 'rmse', 'rmse_log', 'd1_all', 'a1', 'a2', 'a3'))
-        print("{:10.4f}, {:10.4f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}".format(abs_rel_mean, sq_rel_mean, rmse_mean, rmse_log_mean, d1_all_mean, a1_mean, a2_mean, a3_mean))
+        print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('ratio', 'abs_rel_i', 'sq_rel_i', 'rmse_i', 'rmse_log_i', 'd1_all_i', 'a1_i', 'a2_i', 'a3_i', 'abs_rel', 'sq_rel', 'rmse', 'rmse_log', 'd1_all', 'a1', 'a2', 'a3'))
+        print("{:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}".format(rate_mean, abs_rel_inter_mean, sq_rel_inter_mean, rmse_inter_mean, rmse_log_inter_mean, d1_all_inter_mean, a1_inter_mean, a2_inter_mean, a3_inter_mean, abs_rel_mean, sq_rel_mean, rmse_mean, rmse_log_mean, d1_all_mean, a1_mean, a2_mean, a3_mean))
 
         print("total time elapsed: {} s".format(total_time_elapsed))
 

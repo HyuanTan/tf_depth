@@ -33,15 +33,43 @@ def depth_metrics(gt_disp, pred_disp, focal, base, min_depth=1e-3, max_depth=80.
     height = gt_shape[0]
     width = gt_shape[1]
     pred_disp = width * cv2.resize(pred_disp, (width, height), interpolation=cv2.INTER_LINEAR)
-    mask = gt_disp > 0
+    mask_gt = gt_disp > 0
     mask_pred = pred_disp > 0
+    mask_pred_eps = np.full(pred_disp.shape, 1e-6)
+    mask_pred_eps[mask_pred] = 0
+    mask = np.logical_and(mask_gt, mask_pred)
+    rate = 100.0 * mask.sum() / mask_gt.sum()
+
+    gt_depth = focal * base / (gt_disp + (1.0 - mask_gt))
+    pred_depth = focal * base / (pred_disp + mask_pred_eps)
+
+    disp_diff = np.abs(gt_disp[mask] - pred_disp[mask])
+    bad_pixels = np.logical_and(disp_diff >= 3, (disp_diff / gt_disp[mask]) >= 0.05)
+    d1_all_inter = 100.0 * bad_pixels.sum() / mask.sum()
+
+    pred_depth[pred_depth < min_depth] = min_depth
+    pred_depth[pred_depth > max_depth] = max_depth
+
+    thresh = np.maximum((gt_depth[mask] / pred_depth[mask]), (pred_depth[mask] / gt_depth[mask]))
+    a1_inter = (thresh < 1.25   ).mean()
+    a2_inter = (thresh < 1.25 ** 2).mean()
+    a3_inter = (thresh < 1.25 ** 3).mean()
+
+    rmse_inter = (gt_depth[mask] - pred_depth[mask]) ** 2
+    rmse_inter = np.sqrt(rmse_inter.mean())
+
+    rmse_log_inter = (np.log(gt_depth[mask]) - np.log(pred_depth[mask])) ** 2
+    rmse_log_inter = np.sqrt(rmse_log_inter.mean())
+
+    abs_rel_inter = np.mean(np.abs(gt_depth[mask] - pred_depth[mask]) / gt_depth[mask])
+
+    sq_rel_inter = np.mean(((gt_depth[mask] - pred_depth[mask])**2) / gt_depth[mask])
+
+    mask = gt_disp > 0
 
     disp_diff = np.abs(gt_disp[mask] - pred_disp[mask])
     bad_pixels = np.logical_and(disp_diff >= 3, (disp_diff / gt_disp[mask]) >= 0.05)
     d1_all = 100.0 * bad_pixels.sum() / mask.sum()
-
-    gt_depth = focal * base / (gt_disp + (1.0 - mask))
-    pred_depth = focal * base / pred_disp
 
     pred_depth[pred_depth < min_depth] = min_depth
     pred_depth[pred_depth > max_depth] = max_depth
@@ -61,5 +89,6 @@ def depth_metrics(gt_disp, pred_disp, focal, base, min_depth=1e-3, max_depth=80.
 
     sq_rel = np.mean(((gt_depth[mask] - pred_depth[mask])**2) / gt_depth[mask])
 
-    return d1_all, abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3
+
+    return rate, d1_all_inter, abs_rel_inter, sq_rel_inter, rmse_inter, rmse_log_inter, a1_inter, a2_inter, a3_inter, d1_all, abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3
 
