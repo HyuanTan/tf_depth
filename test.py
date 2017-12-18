@@ -23,7 +23,7 @@ tf.app.flags.DEFINE_string('cfg_file', '', """ experimental config file """)
 tf.app.flags.DEFINE_string('sample_path', '', """ path to sample image """)
 tf.app.flags.DEFINE_string('label_path', '', """ path to labels """)
 tf.app.flags.DEFINE_string('stereo_path', '', """ path to stereo image """)
-tf.app.flags.DEFINE_string('output_path', '', """ path to validate label image """)
+tf.app.flags.DEFINE_string('output_path', '', """ path to disparity image """)
 tf.app.flags.DEFINE_boolean('use_avg', True, """ whether to use moving average model """)
 tf.app.flags.DEFINE_boolean('do_pp', True, """ whether to do post processing """)
 
@@ -59,6 +59,11 @@ def main(args):
     if FLAGS.cfg_file:
         print('loading config setting')
         cfg_from_file(FLAGS.cfg_file, cfg)
+    if FLAGS.stereo_path != '':
+        cfg.DO_STEREO = True
+    else:
+        cfg.DO_STEREO = False
+
     cfg.BATCH_SIZE = 1
     if FLAGS.do_pp and not cfg.DO_STEREO:
         cfg.BATCH_SIZE = 2
