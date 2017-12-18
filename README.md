@@ -19,9 +19,12 @@ The baseline is OpenCV stereoBM algorithm. Our Mono/Stereo networks are trained 
 |---|---|---|---|
 |detection_rate| 36.806% | 100% | 100% |
 |RMSE| 4.983 | 5.551 | 4.409 |
-|outlier_rate| 5.607 | 28.077 | 8.234 |
+|abs_relative_err| 0.075 | 0.110 | 0.067 |
+|sqr_relative_err| 1.261 | 1.113 | 0.926 |
 |RMSE_total| 53.371 | 5.551 | 4.409 |
-|outlier_rate_total| 65.192 | 28.077 | 8.234 |
+|abs_relative_err_total| 4.335 | 0.110 | 0.067 |
+|sqr_relative_err_total| 303.102 | 1.113 | 0.926 |
+
 
 The detection_rate is ratio that pixels having disparities computed by the algorithms compared to ground truth.
 Thus, metrics with "_total" suffix are computed on all ground-truth pixels, metrics without "_total" suffix are computed on pixels having algo-detected disparities.
