@@ -9,7 +9,7 @@ This idea is that to train the network in a self-supervised way. That is, the di
 * *Unsupervised Monocular Depth Estimation with Left-Right Consistency*
 * *Semi-Supervised Deep Learning for Monocular Depth Map Prediction*
 
-### Metrics
+### Some metrics
 
 The following metrics is evaluated on Kitti stereo 2015 dataset which has good ground truth.
 
@@ -24,7 +24,9 @@ The baseline is OpenCV stereoBM algorithm. Our Mono/Stereo networks are trained 
 |outlier_rate_total| 65.192 | 28.077 | 8.234 |
 
 The detection_rate is ratio that pixels having disparities computed by the algorithms compared to ground truth.
-Thus, metrics with "_total" suffix are computed on all groud truth pixels, metrics without "_total" suffix are computed on pixels having algo-detected disparities.
+Thus, metrics with "_total" suffix are computed on all ground-truth pixels, metrics without "_total" suffix are computed on pixels having algo-detected disparities.
 
-Since our networks output dense disparity maps, the detection rate is 100%, much higher than the baseline.
+Since our networks can output dense disparity maps, the detection rate is 100%, much higher than the baseline, and also the metrics on all ground-truth pixels are much better than the baseline.
+
+Better results can be obtained by integrating ground-truth disparity in model training.
 
