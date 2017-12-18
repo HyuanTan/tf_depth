@@ -137,11 +137,15 @@ def main(args):
                 }
                 fname = sample_name
             else:
-                image = image if base_path is None else image[0]
                 logger.info("testing for {}".format(fname))
-                feed_dict = {
-                    model.left_image: image
-                }
+                if base_path is None:
+                    feed_dict = {
+                        model.left_image: image
+                    }
+                else:
+                    feed_dict = {
+                        model.left_image: image[0]
+                    }
 
             begin_ts = time.time()
 
@@ -161,7 +165,7 @@ def main(args):
             width = label.shape[1]
             focal = KITTI_FOCAL[width]
             base = KITTI_BASE
-            rate, d1_all_inter, abs_rel_inter, sq_rel_inter, rmse_inter, rmse_log_inter, a1_inter, a2_inter, a3_inter, d1_all, abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3 = depth_metrics(label, disp, focal, base)
+            rate, d1_all_inter, abs_rel_inter, sq_rel_inter, rmse_inter, rmse_log_inter, a1_inter, a2_inter, a3_inter, d1_all, abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3 = depth_metrics(label, disp, focal, base, base_disp)
 
             print(title_str)
             print("{:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}".format(rate, abs_rel_inter, sq_rel_inter, rmse_inter, rmse_log_inter, d1_all_inter, a1_inter, a2_inter, a3_inter, abs_rel, sq_rel, rmse, rmse_log, d1_all, a1, a2, a3))

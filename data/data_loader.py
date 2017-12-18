@@ -9,6 +9,7 @@ import numpy as np
 import skimage
 import skimage.io
 import cv2
+import yaml
 
 def get_filename_list(sample_path, label_path):
     if not sample_path:
@@ -179,9 +180,9 @@ def instance_label_generator(sample_path, label_path, width, height, do_pp=True,
                     for i in range(3):
                         _ = infile.readline()
                     data = yaml.load(infile)
-                height = data['rows']
-                width = data['cols']
-                base_disp = np.array(data['data'], dtype=np.int16).reshape([height, width])
+                h = data['rows']
+                w = data['cols']
+                base_disp = np.array(data['data'], dtype=np.int16).reshape([h, w])
                 base_disp[base_disp<0] = 0
                 base_disp = base_disp.astype(np.float32)/16.0
 
@@ -216,9 +217,9 @@ def instance_label_generator(sample_path, label_path, width, height, do_pp=True,
                     for i in range(3):
                         _ = infile.readline()
                     data = yaml.load(infile)
-                height = data['rows']
-                width = data['cols']
-                base_disp = np.array(data['data'], dtype=np.int16).reshape([height, width])
+                h = data['rows']
+                w = data['cols']
+                base_disp = np.array(data['data'], dtype=np.int16).reshape([h, w])
                 base_disp[base_disp<0] = 0
                 base_disp = base_disp.astype(np.float32)/16.0
 
