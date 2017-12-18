@@ -107,53 +107,123 @@ def instance_generator(sample_path, width, height, do_pp=True, stereo_path=None,
 
             yield ((img_batch, simg_batch), (fname, sfname))
 
-def instance_label_generator(sample_path, label_path, width, height, do_pp=True, stereo_path=None):
+def instance_label_generator(sample_path, label_path, width, height, do_pp=True, stereo_path=None, base_path=None):
     image_fnames, label_fnames = get_filename_list(sample_path, label_path)
 
-    if stereo_path is None:
-        for fname, label_fname in zip(image_fnames, label_fnames):
-            img = cv2.imread(fname)
-            shape = img.shape
-            if shape[0] != height or shape[1] != width:
-                img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
-            b,g,r = cv2.split(img)
-            img = cv2.merge([r,g,b])
-            img = img.astype(np.float32) / 255.0
-            if do_pp:
-                img_flip = np.fliplr(img)
-                img_batch = np.stack([img, img_flip], axis=0)
-            else:
+    if base_path is None:
+        if stereo_path is None:
+            for fname, label_fname in zip(image_fnames, label_fnames):
+                img = cv2.imread(fname)
+                shape = img.shape
+                if shape[0] != height or shape[1] != width:
+                    img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
+                b,g,r = cv2.split(img)
+                img = cv2.merge([r,g,b])
+                img = img.astype(np.float32) / 255.0
+                if do_pp:
+                    img_flip = np.fliplr(img)
+                    img_batch = np.stack([img, img_flip], axis=0)
+                else:
+                    img_batch = np.expand_dims(img, axis=0)
+
+                label = cv2.imread(label_fname, -1)
+                label = label.astype(np.float32) / 256      # for KITTI disp image
+                yield (img_batch, label, fname)
+        else:
+            stereo_fnames, _ = get_filename_list(stereo_path, None)
+            for fname, sfname, label_fname in zip(image_fnames, stereo_fnames, label_fnames):
+                img = cv2.imread(fname)
+                simg = cv2.imread(sfname)
+                shape = img.shape
+                if shape[0] != height or shape[1] != width:
+                    img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
+                    simg = cv2.resize(simg, (width, height), 0, 0, cv2.INTER_AREA)
+
+                b,g,r = cv2.split(img)
+                img = cv2.merge([r,g,b])
+                img = img.astype(np.float32) / 255.0
+
+                b,g,r = cv2.split(simg)
+                simg = cv2.merge([r,g,b])
+                simg = simg.astype(np.float32) / 255.0
+
+                # for stereo, no need to post process, since the flipping
+                # would cause the swapping of the left/right in stereo pair
                 img_batch = np.expand_dims(img, axis=0)
+                simg_batch = np.expand_dims(simg, axis=0)
 
-            label = cv2.imread(label_fname, -1)
-            label = label.astype(np.float32) / 256      # for KITTI disp image
-            yield (img_batch, label, fname)
+                label = cv2.imread(label_fname, -1)
+                label = label.astype(np.float32) / 256      # for KITTI disp image
+                yield ((img_batch, simg_batch), label, (fname, sfname))
     else:
-        stereo_fnames, _ = get_filename_list(stereo_path, None)
-        for fname, sfname, label_fname in zip(image_fnames, stereo_fnames, label_fnames):
-            img = cv2.imread(fname)
-            simg = cv2.imread(sfname)
-            shape = img.shape
-            if shape[0] != height or shape[1] != width:
-                img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
-                simg = cv2.resize(simg, (width, height), 0, 0, cv2.INTER_AREA)
+        base_fnames, _ = get_filename_list(base_path, None)
+        if stereo_path is None:
+            for fname, bfname, label_fname in zip(image_fnames, base_fnames, label_fnames):
+                img = cv2.imread(fname)
+                shape = img.shape
+                if shape[0] != height or shape[1] != width:
+                    img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
+                b,g,r = cv2.split(img)
+                img = cv2.merge([r,g,b])
+                img = img.astype(np.float32) / 255.0
+                if do_pp:
+                    img_flip = np.fliplr(img)
+                    img_batch = np.stack([img, img_flip], axis=0)
+                else:
+                    img_batch = np.expand_dims(img, axis=0)
 
-            b,g,r = cv2.split(img)
-            img = cv2.merge([r,g,b])
-            img = img.astype(np.float32) / 255.0
+                label = cv2.imread(label_fname, -1)
+                label = label.astype(np.float32) / 256      # for KITTI disp image
 
-            b,g,r = cv2.split(simg)
-            simg = cv2.merge([r,g,b])
-            simg = simg.astype(np.float32) / 255.0
+                with open(bfname) as infile: # currently yml file
+                    for i in range(3):
+                        _ = infile.readline()
+                    data = yaml.load(infile)
+                height = data['rows']
+                width = data['cols']
+                base_disp = np.array(data['data'], dtype=np.int16).reshape([height, width])
+                base_disp[base_disp<0] = 0
+                base_disp = base_disp.astype(np.float32)/16.0
 
-            # for stereo, no need to post process, since the flipping
-            # would cause the swapping of the left/right in stereo pair
-            img_batch = np.expand_dims(img, axis=0)
-            simg_batch = np.expand_dims(simg, axis=0)
+                yield ((img_batch, base_disp), label, fname)
+        else:
+            stereo_fnames, _ = get_filename_list(stereo_path, None)
+            for fname, sfname, bfname, label_fname in zip(image_fnames, stereo_fnames, base_fnames, label_fnames):
+                img = cv2.imread(fname)
+                simg = cv2.imread(sfname)
+                shape = img.shape
+                if shape[0] != height or shape[1] != width:
+                    img = cv2.resize(img, (width, height), 0, 0, cv2.INTER_AREA)
+                    simg = cv2.resize(simg, (width, height), 0, 0, cv2.INTER_AREA)
 
-            label = cv2.imread(label_fname, -1)
-            label = label.astype(np.float32) / 256      # for KITTI disp image
-            yield ((img_batch, simg_batch), label, (fname, sfname))
+                b,g,r = cv2.split(img)
+                img = cv2.merge([r,g,b])
+                img = img.astype(np.float32) / 255.0
+
+                b,g,r = cv2.split(simg)
+                simg = cv2.merge([r,g,b])
+                simg = simg.astype(np.float32) / 255.0
+
+                # for stereo, no need to post process, since the flipping
+                # would cause the swapping of the left/right in stereo pair
+                img_batch = np.expand_dims(img, axis=0)
+                simg_batch = np.expand_dims(simg, axis=0)
+
+                label = cv2.imread(label_fname, -1)
+                label = label.astype(np.float32) / 256      # for KITTI disp image
+
+                with open(bfname) as infile: # currently yml file
+                    for i in range(3):
+                        _ = infile.readline()
+                    data = yaml.load(infile)
+                height = data['rows']
+                width = data['cols']
+                base_disp = np.array(data['data'], dtype=np.int16).reshape([height, width])
+                base_disp[base_disp<0] = 0
+                base_disp = base_disp.astype(np.float32)/16.0
+
+                yield ((img_batch, simg_batch, base_disp), label, (fname, sfname))
+
 
 
 class LoadingPipeline(object):

@@ -23,6 +23,7 @@ tf.app.flags.DEFINE_string('cfg_file', '', """ experimental config file """)
 tf.app.flags.DEFINE_string('sample_path', '', """ path to sample image """)
 tf.app.flags.DEFINE_string('label_path', '', """ path to labels """)
 tf.app.flags.DEFINE_string('stereo_path', '', """ path to stereo image """)
+tf.app.flags.DEFINE_string('base_path', '', """ path to baseline """)
 tf.app.flags.DEFINE_string('output_path', '', """ path to disparity image """)
 tf.app.flags.DEFINE_boolean('use_avg', True, """ whether to use moving average model """)
 tf.app.flags.DEFINE_boolean('do_pp', True, """ whether to do post processing """)
@@ -63,6 +64,15 @@ def main(args):
         cfg.DO_STEREO = True
     else:
         cfg.DO_STEREO = False
+
+    base_path = None
+    title_str = "{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('ratio', 'abs_rel_i', 'sq_rel_i', 'rmse_i', 'rmse_log_i', 'd1_all_i', 'a1_i', 'a2_i', 'a3_i', 'abs_rel', 'sq_rel', 'rmse', 'rmse_log', 'd1_all', 'a1', 'a2', 'a3')
+    if FLAGS.base_path != '':
+        base_path = FLAGS.base_path
+        title_str = "{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('ratio', 'abs_rel', 'sq_rel', 'rmse', 'rmse_log', 'd1_all', 'a1', 'a2', 'a3', 'abs_rel_b', 'sq_rel_b', 'rmse_b', 'rmse_log_b', 'd1_all_b', 'a1_b', 'a2_b', 'a3_b')
+
+
+    stereo_path = FLAGS.stereo_path if cfg.DO_STEREO else None
 
     cfg.BATCH_SIZE = 1
     if FLAGS.do_pp and not cfg.DO_STEREO:
@@ -114,10 +124,9 @@ def main(args):
         a2_list       = []
         a3_list       = []
 
-        stereo_path = FLAGS.stereo_path if cfg.DO_STEREO else None
 
-        for image, label, fname in instance_label_generator(FLAGS.sample_path, FLAGS.label_path,
-                                                            cfg.IMAGE_WIDTH, cfg.IMAGE_HEIGHT, FLAGS.do_pp, stereo_path):
+        for image, label, fname in instance_label_generator(FLAGS.sample_path, FLAGS.label_path, cfg.IMAGE_WIDTH, cfg.IMAGE_HEIGHT,
+                                                            FLAGS.do_pp, stereo_path, base_path=base_path):
             if cfg.DO_STEREO:
                 sample_name = fname[0]
                 stereo_name = fname[1]
@@ -128,6 +137,7 @@ def main(args):
                 }
                 fname = sample_name
             else:
+                image = image if base_path is None else image[0]
                 logger.info("testing for {}".format(fname))
                 feed_dict = {
                     model.left_image: image
@@ -146,12 +156,14 @@ def main(args):
             else:
                 disp = pre_disp[0].squeeze()
 
+            base_disp = None if base_path is None else image[-1]
+
             width = label.shape[1]
             focal = KITTI_FOCAL[width]
             base = KITTI_BASE
             rate, d1_all_inter, abs_rel_inter, sq_rel_inter, rmse_inter, rmse_log_inter, a1_inter, a2_inter, a3_inter, d1_all, abs_rel, sq_rel, rmse, rmse_log, a1, a2, a3 = depth_metrics(label, disp, focal, base)
 
-            print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('ratio', 'abs_rel_i', 'sq_rel_i', 'rmse_i', 'rmse_log_i', 'd1_all_i', 'a1_i', 'a2_i', 'a3_i', 'abs_rel', 'sq_rel', 'rmse', 'rmse_log', 'd1_all', 'a1', 'a2', 'a3'))
+            print(title_str)
             print("{:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}".format(rate, abs_rel_inter, sq_rel_inter, rmse_inter, rmse_log_inter, d1_all_inter, a1_inter, a2_inter, a3_inter, abs_rel, sq_rel, rmse, rmse_log, d1_all, a1, a2, a3))
 
             rate_list.append(rate)
@@ -199,7 +211,7 @@ def main(args):
         a3_mean = np.array(a3_list).mean()
 
         print("============total metric============")
-        print("{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}".format('ratio', 'abs_rel_i', 'sq_rel_i', 'rmse_i', 'rmse_log_i', 'd1_all_i', 'a1_i', 'a2_i', 'a3_i', 'abs_rel', 'sq_rel', 'rmse', 'rmse_log', 'd1_all', 'a1', 'a2', 'a3'))
+        print(title_str)
         print("{:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}, {:10.3f}".format(rate_mean, abs_rel_inter_mean, sq_rel_inter_mean, rmse_inter_mean, rmse_log_inter_mean, d1_all_inter_mean, a1_inter_mean, a2_inter_mean, a3_inter_mean, abs_rel_mean, sq_rel_mean, rmse_mean, rmse_log_mean, d1_all_mean, a1_mean, a2_mean, a3_mean))
 
         print("total time elapsed: {} s".format(total_time_elapsed))
